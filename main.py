@@ -222,6 +222,50 @@ def modificar_topologia(pdb_dir):
 
     print("\nCampo de fuerza y topología modificados correctamente ^v^.")
 
+def actualizar_topologia_con_dppc(topol_path, gro_path, n_atoms_por_dppc=50):
+    with open(gro_path, 'r') as f:
+        gro_lines = f.readlines()
+    n_gro_atoms = len(gro_lines) - 3  
+
+    with open(topol_path, 'r') as f:
+        lines = f.readlines()
+
+    mol_index = None
+    for i, line in enumerate(lines):
+        if line.strip().lower() == "[ molecules ]":
+            mol_index = i
+            break
+
+    if mol_index is None:
+        print("No se encontró la sección [ molecules ] en topol.top")
+        return
+
+    protein_atoms = 0
+    for i in range(mol_index + 1, len(lines)):
+        if lines[i].strip() == "" or lines[i].strip().startswith(";"):
+            continue
+        try:
+            _, count = lines[i].split()
+            protein_atoms = int(count)
+            break
+        except ValueError:
+            continue
+
+    n_dppc = (n_gro_atoms - protein_atoms) // n_atoms_por_dppc
+    print(f"🧮 Número de DPPC = ({n_gro_atoms} - {protein_atoms}) // 50 = {n_dppc}")
+
+    for i in reversed(range(len(lines))):
+        if lines[i].strip() == "" or lines[i].strip().startswith(";"):
+            continue
+        if lines[i].strip().lower().startswith("dppc") or lines[i].strip().lower().startswith("protein"):
+            lines[i] = f"DPPC\t{n_dppc}\n"
+            break
+
+    with open(topol_path, 'w') as f:
+        f.writelines(lines)
+
+    print("Línea final de topol.top actualizada con DPPC correctamente.")
+
 
 
 def caja_y_solvatar(prot, pdb_dir):
@@ -298,9 +342,35 @@ def caja_y_solvatar(prot, pdb_dir):
 
     with open(minim_path, "w") as f:
         f.writelines(contenido)
+    
+
+    origen_minimInf = os.path.join("files", "minim_inflategro.mdp")
+    destino_minimInf = os.path.join(pdb_dir, "minim_inflategro.mdp")
+    shutil.copyfile(origen_minimInf, destino_minimInf)
+
+    print("\nInflando el sistema...\n")
+
+    
+
+
+    run(f"perl {pdb_dir}/inflategro.pl {pdb_dir}/system.gro 4 DPPC 14 {pdb_dir}/system_inflated.gro 5 area.dat")
+    actualizar_topologia_con_dppc(
+        topol_path=os.path.join(pdb_dir, "topol.top"),
+        gro_path=os.path.join(pdb_dir, "system_inflated.gro")
+    )
     origen_mdout = os.path.join("mdout.mdp")
     destino_mdout = os.path.join(pdb_dir, "mdout.mdp")
     shutil.move(origen_mdout, destino_mdout)
+
+    origen_area = os.path.join("area.dat")
+    destino_area = os.path.join(pdb_dir, "area.dat")
+    shutil.move(origen_area, destino_area)
+
+    run(f"gmx grompp -f {pdb_dir}/minim_inflategro.mdp -c {pdb_dir}/system_inflated.gro -p {pdb_dir}/topol.top -r {pdb_dir}/system_inflated.gro -o {pdb_dir}/system_inflated_em.tpr")
+    run(f"gmx mdrun -deffnm {pdb_dir}/system_inflated_em")
+    run(f"gmx trjconv -s {pdb_dir}/system_inflated_em.tpr -f {pdb_dir}/system_inflated_em.gro -o {pdb_dir}/tmp.gro -pbc mol")
+    run(f"mv {pdb_dir}/tmp.gro {pdb_dir}/system_inflated_em.gro")
+    run(f"perl {pdb_dir}/inflategro.pl {pdb_dir}/system_inflated_em.gro 0.95 DPPC 0 {pdb_dir}/system_shrink1.gro 5 {pdb_dir}/area_shrink1.dat")
 
 
 

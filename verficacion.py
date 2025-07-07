@@ -7,7 +7,7 @@ def verificar_atomtypes_faltantes(path_top_or_itp, path_ffnonbonded):
         contenido_ff = f.read()
 
     usados = set(re.findall(r'^\s*(\D\w*)\s+\d+\s+\d+\.\d+\s+[-+]?\d*\.\d+|\d+', contenido_top, re.MULTILINE))
-    usados = {u for u in usados if u and not u.isdigit()}  # solo nombres válidos
+    usados = {u for u in usados if u and not u.isdigit()}  
 
     definidos = set()
     in_atomtypes = False
@@ -33,4 +33,4 @@ def verificar_atomtypes_faltantes(path_top_or_itp, path_ffnonbonded):
 
 
 
-verificar_atomtypes_faltantes("/Users/leonardoponzebellido/Documents/Protein_in_membrane/membranas/dppc128/lipid.itp", "/Users/leonardoponzebellido/Documents/Simulacion/gromos53a6_lipid.ff/ffnonbonded.itp")
+verificar_atomtypes_faltantes("ruta1", "ruta2")
