@@ -45,7 +45,7 @@ def generar_topologia(prot, pdb, pdb_dir):
 def insertar_en_seccion(filepath, seccion, nuevas_lineas, limpiar=False):
     """
     Inserta nuevas líneas en la sección indicada de un archivo .itp.
-    Si limpiar=True, elimina ciertas líneas innecesarias como comentarios obsoletos o duplicados.
+    Si limpiar=True y la sección es 'nonbond_params', reemplaza 'HW' por 'H' en las líneas.
     """
     with open(filepath, 'r') as f:
         lineas = f.readlines()
@@ -71,11 +71,7 @@ def insertar_en_seccion(filepath, seccion, nuevas_lineas, limpiar=False):
 
     originales = lineas[inicio:fin]
     if limpiar and seccion.lower() == "nonbond_params":
-        originales = [
-            l for l in originales
-            if ";; parameters for lipid-GROMOS interactions" not in l
-            and "HW" not in l
-        ]
+        originales = [l.replace('HW', 'H') for l in originales]
 
     contenido += originales
 
@@ -90,7 +86,8 @@ def insertar_en_seccion(filepath, seccion, nuevas_lineas, limpiar=False):
         f.writelines(contenido)
 
 
-def modificar_topologia(prot, pdb_dir):
+
+def modificar_topologia(pdb_dir):
     print("\n====== Paso 2: Modificar la topología de la proteína ======\n")
     print("Vamos a modificar el campo de fuerza para incluir parámetros de lípidos Berger.")
     print("¿Deseas continuar? (s/n): ", end="")
@@ -139,21 +136,35 @@ def modificar_topologia(prot, pdb_dir):
         "LNL":  "  LNL    7    14.0067      0.000     A  3.35300e-03 3.95100e-06 ;Nitrogen, OPLS\n",
         "LC":   "   LC    6    12.0110      0.000     A  4.88800e-03 1.35900e-05 ;Carbonyl C, OPLS\n",
         "LH1":  "  LH1    6    13.0190      0.000     A  4.03100e-03 1.21400e-05 ;CH1, OPLS\n",
+        "CA":   "   CA    6    12.0110      0.000     A  3.50000e-03 1.77000e-05 ;alpha carbon, standard GROMOS\n",
         "LH2":  "  LH2    6    14.0270      0.000     A  7.00200e-03 2.48300e-05 ;CH2, OPLS\n",
+        "CB":   "   CB    6    12.0110      0.000     A  4.86800e-03 1.25900e-05 ;beta carbon, Berger\n",
+        "CD":   "   CD    6    12.0110      0.000     A  4.86800e-03 1.25900e-05 ;delta carbon, Berger\n",
         "LP":   "   LP   15    30.9738      0.000     A  9.16000e-03 2.50700e-05 ;phosphor, OPLS\n",
         "LOS":  "  LOS    8    15.9994      0.000     A  2.56300e-03 1.86800e-06 ;ester oxygen, OPLS\n",
         "LP2":  "  LP2    6    14.0270      0.000     A  5.87400e-03 2.26500e-05 ;RB CH2, Bergers LJ\n",
+        "CP":   "   CP    6    12.0110      0.000     A  4.86800e-03 1.25900e-05 ;phosphate carbon, Berger\n",
+        "CP2":  "  CP2    6    12.0110      0.000     A  4.86800e-03 1.25900e-05 ;glycerol carbon, Berger\n",
+        "CR5":  "  CR5    6    12.0110      0.000     A   5.96000e-03 1.77000e-05 ;aromatic C5 (Berger)\n",
         "LP3":  "  LP3    6    15.0350      0.000     A  8.77700e-03 3.38500e-05 ;RB CH3, Bergers LJ\n",
+        "CP3":  "  CP3    6    15.0350      0.000     A  8.77700e-03 3.38500e-05 ;methyl carbon, Berger\n",
         "LC3":  "  LC3    6    15.0350      0.000     A  9.35700e-03 3.60900e-05 ;CH3, OPLS\n",
-        "LC2":  "  LC2    6    14.0270      0.000     A  5.94700e-03 1.79000e-05 ;CH2, OPLS\n",
+        "LC2":  "  LC2    6    14.0270      0.000     A  5.94700e-03 1.79000e-05 ;CH2, OPLS\n"
     }
 
+
     atomtypes_mod = []
+    tipos_en_lipid = set()
+
     for line in atomtypes:
         if line.strip().startswith("[") or line.strip().startswith(";") or line.strip() == "":
             continue
         key = line.split()[0]
+        tipos_en_lipid.add(key)
         atomtypes_mod.append(tabla_atomtypes.get(key, line))
+    for key, linea in tabla_atomtypes.items():
+        if key not in tipos_en_lipid:
+            atomtypes_mod.append(linea)
 
     ffnb = os.path.join(destino_ff, "ffnonbonded.itp")
     ffbonded = os.path.join(destino_ff, "ffbonded.itp")
@@ -170,42 +181,85 @@ def modificar_topologia(prot, pdb_dir):
     topol = os.path.join(pdb_dir, "topol.top")
     if os.path.exists(topol):
         with open(topol, "r") as f:
-            contenido = f.read()
-        contenido = contenido.replace(
-            'gromos53a6.ff/forcefield.itp',
-            'gromos53a6_lipid.ff/forcefield.itp'
-        ).replace(
-            'gromos53a6.ff/spc.itp',
-            'gromos53a6_lipid.ff/spc.itp'
-        ).replace(
-            'gromos53a6.ff/ions.itp',
-            'gromos53a6_lipid.ff/ions.itp'
-        )
-        with open(topol, "w") as f:
-            f.write(contenido)
-
-        with open(topol, "r") as f:
             lines = f.readlines()
 
         new_lines = []
         inserted_dppc = False
         for i, line in enumerate(lines):
+            line = line.replace('gromos53a6.ff/forcefield.itp', 'gromos53a6_lipid.ff/forcefield.itp')
+            line = line.replace('gromos53a6.ff/spc.itp', 'gromos53a6_lipid.ff/spc.itp')
+            line = line.replace('gromos53a6.ff/ions.itp', 'gromos53a6_lipid.ff/ions.itp')
             new_lines.append(line)
 
             if not inserted_dppc and line.strip() == "#endif":
                 if i >= 2 and lines[i - 2].strip() == "#ifdef POSRES":
                     new_lines.append("\n; Include DPPC chain topology\n")
                     new_lines.append('#include "dppc.itp"\n')
+                    new_lines.append("\n; Strong position restraints for InflateGRO\n")
+                    new_lines.append('#ifdef STRONG_POSRES\n')
+                    new_lines.append('#include "strong_posre.itp"\n')
+                    new_lines.append('#endif\n')
                     inserted_dppc = True
 
         with open(topol, "w") as f:
             f.writelines(new_lines)
 
+
         print("\ntopol.top actualizado con include de DPPC, SPC e IONS corregidos.")
 
-
-
     print("\nCampo de fuerza y topología modificados correctamente ^v^.")
+
+def caja_y_solvatar(prot, pdb_dir):
+    print("\n====== Paso 3: Caja de solvatación ======\n")
+
+    print("Vamos a preparar la caja con la membrana DPPC y solvatación.")
+    if input("¿Deseas continuar? (s/n): ").strip().lower() != 's':
+        print("Operación cancelada.")
+        return
+
+    minim_path = os.path.join(os.getcwd(), "files", "minim.mdp")
+    dppc_path = os.path.join(os.getcwd(), "membranas", "dppc128", "dppc128.pdb")
+    top_path = os.path.join(os.getcwd(), "files", "topol_dppc.top")
+    tpr_out = os.path.join(pdb_dir, "dppc.tpr")
+    whole_out = os.path.join(pdb_dir, "dppc128_whole.gro")
+
+    print("\nOrientando la membrana y generando estructura completa de DPPC...")
+
+    topol_dppc_in_pdb = os.path.join(pdb_dir, "topol_dppc.top")
+    shutil.copyfile(top_path, topol_dppc_in_pdb)
+
+    run(f"gmx grompp -f {minim_path} -c {dppc_path} -p {topol_dppc_in_pdb} -o {tpr_out} -maxwarn 1")
+
+    print(f"\nSeleccionar grupo 0, 'System' para la siguiente pregunta.")
+    input("¿Entendido? Presiona Enter para continuar...")
+    run(f"gmx trjconv -s {tpr_out} -f {dppc_path} -o {whole_out} -pbc mol -ur compact -maxwarn 1")
+
+    print("\nInsertando la proteína en la caja...")
+
+    usar_defecto = input("¿Deseas usar las dimensiones por defecto de la caja de DPPC128? (s/n): ").strip().lower()
+    if usar_defecto == 's':
+        box_coords = "6.41840 6.44350 6.59650"
+    else:
+        while True:
+            coords_input = input("Introduce las dimensiones de la caja (x y z en nm, separadas por espacios): ").strip()
+            partes = coords_input.split()
+            if len(partes) == 3:
+                try:
+                    float(partes[0]); float(partes[1]); float(partes[2])
+                    box_coords = coords_input
+                    break
+                except ValueError:
+                    print("Error: Las coordenadas deben ser números.")
+            else:
+                print("Error: Debes ingresar 3 valores separados por espacio.")
+
+    prot_gro = os.path.join(pdb_dir, f"{prot}_processed.gro")
+    newbox_gro = os.path.join(pdb_dir, f"{prot}_newbox.gro")
+
+    run(f"gmx editconf -f {prot_gro} -o {newbox_gro} -c -box {box_coords}")
+
+    print(f"\nCaja creada con dimensiones: {box_coords} y proteína centrada.")
+
 
 
 def main():
@@ -226,9 +280,9 @@ def main():
     
     generar_topologia(prot, pdb, pdb_dir)
 
-    modificar_topologia(prot, pdb_dir)
+    modificar_topologia(pdb_dir)
 
-    # membrana = elegir_membrana()
+    caja_y_solvatar(prot, pdb_dir)
 
     
 
