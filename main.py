@@ -284,7 +284,18 @@ def caja_y_solvatar(prot, pdb_dir):
     destinoInf = os.path.join(pdb_dir, "inflategro.pl")
     shutil.copyfile(origenInf, destinoInf)
 
-    run(f"cat {pdb_dir}/KALP-15_newbox.gro {pdb_dir}/dppc128_whole.gro > {pdb_dir}/system.gro")
+    run(f"cat {pdb_dir}/{prot}_newbox.gro {pdb_dir}/dppc128_whole.gro > {pdb_dir}/system.gro")
+    print("\nGenerando nuevo archivo de restricción de posición usando genrestr...\n")
+    run(f"gmx genrestr -f {pdb_dir}/{prot}_newbox.gro -o strong_posre.itp -fc 100000 100000 100000")
+
+    with open(minim_path, "r") as f:
+        contenido = f.readlines()
+
+    if not contenido or "define = -DSTRONG_POSRES" not in contenido[0]:
+        contenido.insert(0, "define = -DSTRONG_POSRES\n")
+
+    with open(minim_path, "w") as f:
+        f.writelines(contenido)
 
 
 def main():
