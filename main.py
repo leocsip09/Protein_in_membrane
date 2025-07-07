@@ -1,6 +1,7 @@
 import os
 import subprocess
 import shutil
+import re
 
 def run(cmd, msg=None):
     print(f"\n> Ejecutando: {cmd}")
@@ -41,6 +42,19 @@ def generar_topologia(prot, pdb, pdb_dir):
         if f.endswith(".ff") and os.path.isdir(f):
             shutil.move(f, os.path.join(pdb_dir, f))
 
+def modificar_topologia(prot, pdb_dir):
+    print("\n====== Paso 2: Modificar la topología de la proteína ======\n")
+    destino_ff = os.path.join(pdb_dir, "gromos53a6_lipid.ff")
+    print("Modificando campo de fuerza (forcefield.doc) para incluir parámetros de lípidos Berger...")
+
+    run(f"cp -r /usr/local/gromacs/share/gromacs/top/gromos53a6.ff \"{destino_ff}\"")
+
+    forcefield_doc_path = os.path.join(destino_ff, "forcefield.doc")
+    with open(forcefield_doc_path, "w") as f:
+        f.write("GROMOS96 53a6 force field, extended to include Berger lipid parameters\n")
+
+    print("forcefield.doc modificado correctamente ^v^.")
+
 
 def main():
     print("\n====== Proteina en membrana con GROMACS automatizada c; ======\n")
@@ -59,6 +73,8 @@ def main():
     pdb_dir = os.path.dirname(os.path.abspath(pdb))
     
     generar_topologia(prot, pdb, pdb_dir)
+
+    modificar_topologia(prot, pdb_dir)
 
     # membrana = elegir_membrana()
 
