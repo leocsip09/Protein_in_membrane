@@ -252,7 +252,7 @@ def actualizar_topologia_con_dppc(topol_path, gro_path, n_atoms_por_dppc=50):
             continue
 
     n_dppc = (n_gro_atoms - protein_atoms) // n_atoms_por_dppc
-    print(f"🧮 Número de DPPC = ({n_gro_atoms} - {protein_atoms}) // 50 = {n_dppc}")
+    print(f"Número de DPPC = ({n_gro_atoms} - {protein_atoms}) // 50 = {n_dppc}")
 
     for i in reversed(range(len(lines))):
         if lines[i].strip() == "" or lines[i].strip().startswith(";"):
