@@ -247,7 +247,7 @@ def caja_y_solvatar(prot, pdb_dir):
     topol_dppc_in_pdb = os.path.join(pdb_dir, "topol_dppc.top")
     shutil.copyfile(top_path, topol_dppc_in_pdb)
 
-    run(f"gmx grompp -f {minim_path} -c {dppc_path} -p {topol_dppc_in_pdb} -o {tpr_out} -maxwarn 1")
+    run(f"gmx grompp -f {minim_path} -c {dppc_path} -p {topol_dppc_in_pdb} -o {tpr_out} -maxwarn 3")
 
     print(f"\nSeleccionar grupo 0, 'System' para la siguiente pregunta.")
     input("¿Entendido? Presiona Enter para continuar...")
@@ -286,7 +286,9 @@ def caja_y_solvatar(prot, pdb_dir):
 
     run(f"cat {pdb_dir}/{prot}_newbox.gro {pdb_dir}/dppc128_whole.gro > {pdb_dir}/system.gro")
     print("\nGenerando nuevo archivo de restricción de posición usando genrestr...\n")
-    run(f"gmx genrestr -f {pdb_dir}/{prot}_newbox.gro -o strong_posre.itp -fc 100000 100000 100000")
+    print("En la siguiente opción, selecciona el Grupo 1 (1), que corresponde a restringir la posición de la proteína nvn/.\n")
+    input("\n¿Entendido? Presiona Enter para continuar...")
+    run(f"gmx genrestr -f {pdb_dir}/{prot}_newbox.gro -o {pdb_dir}/strong_posre.itp -fc 100000 100000 100000")
 
     with open(minim_path, "r") as f:
         contenido = f.readlines()
@@ -296,6 +298,10 @@ def caja_y_solvatar(prot, pdb_dir):
 
     with open(minim_path, "w") as f:
         f.writelines(contenido)
+    origen_mdout = os.path.join("mdout.mdp")
+    destino_mdout = os.path.join(pdb_dir, "mdout.mdp")
+    shutil.move(origen_mdout, destino_mdout)
+
 
 
 def main():
