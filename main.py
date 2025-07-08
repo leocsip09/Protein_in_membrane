@@ -403,7 +403,7 @@ def caja_y_solvatar(prot, pdb_dir):
     run(f"perl {pdb_dir}/inflategro.pl {pdb_dir}/system_inflated_em.gro 0.95 DPPC 0 {pdb_dir}/system_shrink1.gro 5 {pdb_dir}/area_shrink1.dat")
 
     print("\nReduciendo el tamaño de la caja...\nVamos a hacer lo mismo 26 veces :p")
-    input("Entendido? Presiona Enter para continuar...")
+    input("¿Entendido? Presiona Enter para continuar...")
 
     run("gcc -o shrink_loop files/shrink_loop.c")
 
@@ -431,6 +431,84 @@ def caja_y_solvatar(prot, pdb_dir):
     origen_mdout = os.path.join("mdout.mdp")
     destino_mdout = os.path.join(pdb_dir, "mdout.mdp")
     shutil.move(origen_mdout, destino_mdout)
+
+import subprocess
+import os
+
+def neutralizar_sistema(pdb_dir):
+    ions_tpr = os.path.join(pdb_dir, "ions.tpr")
+    solv_fix = os.path.join(pdb_dir, "system_solv_fix.gro")
+    output = os.path.join(pdb_dir, "system_solv_ions.gro")
+    topol = os.path.join(pdb_dir, "topol.top")
+
+    print("\nNeutralizando el sistema con iones...")
+    print("\nLista de grupos disponibles para reemplazar (generalmente agua):")
+    subprocess.run(f"gmx make_ndx -f {solv_fix} -o {pdb_dir}/index.ndx", shell=True, input="q\n", text=True)
+    subprocess.run(f"gmx genion -s {ions_tpr} -o {output} -p {topol} -pname NA -nname CL -neutral -n {pdb_dir}/index.ndx", shell=True)
+
+    grupo = input("\nIngrese el número del grupo que desea reemplazar con iones (ej. 13 para SOL): ").strip()
+
+    proceso = subprocess.Popen(
+        f"gmx genion -s {ions_tpr} -o {output} -p {topol} -pname NA -nname CL -neutral -n {pdb_dir}/index.ndx",
+        shell=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+
+    stdout, stderr = proceso.communicate(input=f"{grupo}\n")
+
+    print(stdout)
+    if proceso.returncode != 0:
+        print("\nError al ejecutar gmx genion:\n")
+        print(stderr)
+        raise RuntimeError("gmx genion falló")
+
+
+
+def Add_ions(pdb_dir):
+    print("\n====== Paso 4: Añadir iones al sistema ======\n")
+    print("\nVamos a añadir iones al sistema para neutralizar las cargas.")
+    input("¿Entendido? Presiona Enter para continuar...")
+
+    run(f"gmx grompp -f files/ions.mdp -c {pdb_dir}/system_solv_fix.gro -p {pdb_dir}/topol.top -o {pdb_dir}/ions.tpr")
+    neutralizar_sistema(pdb_dir)
+    print("\nIones añadidos al sistema y topología actualizada correctamente.\n")
+
+def verificar_minimizacion(pdb_dir):
+    print("\nVerificando la minimización energética (Epot y Fmax)...")
+
+    xvg_path = os.path.join(pdb_dir, "em_ener.xvg")
+    edr_path = os.path.join(pdb_dir, "em.edr")
+
+    subprocess.run(f"echo 10 11 | gmx energy -f {edr_path} -o {xvg_path}", shell=True, check=True)
+
+    with open(xvg_path, "r") as f:
+        lines = [line.strip() for line in f if not line.startswith(("#", "@"))]
+        if not lines:
+            print("No se encontraron datos en em_ener.xvg")
+            return
+        last_line = lines[-1].split()
+        time = float(last_line[0])
+        epot = float(last_line[1])
+        fmax = float(last_line[2])
+        print(f"\nÚltimo paso de minimización:\nTiempo = {time} ps\nEpot = {epot:.2f} kJ/mol\nFmax = {fmax:.2f} kJ/mol/nm")
+    print("\n ¿Deseas visualizar el gráfico de energía potencial y fuerza máxima? (s/n): ", end="")
+    if input().strip().lower() == 's':
+        print("\nAbriendo gráfico con xmgrace...\n")
+        subprocess.run(f"xmgrace {xvg_path}", shell=True)
+
+def minimizacion_energia(pdb_dir):
+    print("\n====== Paso 5: Minimización energética ======\n")
+    print("\nVamos a añadir iones al sistema para neutralizar las cargas c:.")
+    input("¿Entendido? Presiona Enter para continuar...")
+    run(f"gmx grompp -f files/minim_en.mdp -c {pdb_dir}/system_solv_ions.gro -p {pdb_dir}/topol.top -o {pdb_dir}/em.tpr")
+    run(f"gmx mdrun -deffnm {pdb_dir}/em")
+    print("Minimización completada, verificando que todo esté en orden...")
+    verificar_minimizacion(pdb_dir)
+    print("\nMinimización energética completada correctamente. El sistema está listo para la simulación.\n")
+
 
 
 def main():
