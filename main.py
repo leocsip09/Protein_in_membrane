@@ -263,9 +263,6 @@ def actualizar_topologia_con_dppc(topol_path, gro_path_system, gro_path_protein,
     with open(topol_path, "w") as f:
         f.writelines(lines)
 
-
-
-
 def caja_y_solvatar(prot, pdb_dir):
     print("\n====== Paso 3: Caja de solvatación ======\n")
 
@@ -377,9 +374,30 @@ def caja_y_solvatar(prot, pdb_dir):
 
     run(f"./shrink_loop {pdb_dir}")
 
+    print("\nEmpezando la solvatación con agua...\n")
+    run(f"gmx solvate -cp {pdb_dir}/system_shrink26_em.gro -cs spc216.gro -o {pdb_dir}/system_solv.gro -p {pdb_dir}/topol.top")
+    print("\n¿Deseas visualizar el sistema con VMD? (s/n): ", end="")
+    if input().strip().lower() == 's':
+        if shutil.which("vmd"):
+            run(f"vmd {pdb_dir}/system_solv.gro")
+        else:
+            print("VMD no está instalado o no está en el PATH.")
+
+    print("\n¿Desea eliminar el excedente de moléculas de agua? (Es necesario) (s/n)\n")
+    if input().strip().lower() == 's':
+        run(f"perl files/water_deletor.pl -in {pdb_dir}/system_solv.gro -out {pdb_dir}/system_solv_fix.gro -ref O33 -middle C50 -nwater 3")
+    print("\n¿Deseas visualizar cómo se ve el sistema actualmente con VMD? (s/n): ", end="")
+    if input().strip().lower() == 's':
+        if shutil.which("vmd"):
+            run(f"vmd {pdb_dir}/system_solv_fix.gro")
+        else:
+            print("VMD no está instalado o no está en el PATH.")
+
+
     origen_mdout = os.path.join("mdout.mdp")
     destino_mdout = os.path.join(pdb_dir, "mdout.mdp")
     shutil.move(origen_mdout, destino_mdout)
+
 
 def main():
     print("\n====== Proteina en membrana con GROMACS automatizada c; ======\n")

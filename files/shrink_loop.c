@@ -5,7 +5,7 @@
 
 // A quien esté leyendo esto:
 // ¿Esperabas un script de bash? 
-// Se entiende, solo quería usar C solo por los jajas. ^^
+// Se entiende, solo quería usar C por los jajas. ^^
 
 int main(int argc, char *argv[]) {
     char command[2048];
