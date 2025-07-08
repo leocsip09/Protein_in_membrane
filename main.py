@@ -263,6 +263,41 @@ def actualizar_topologia_con_dppc(topol_path, gro_path_system, gro_path_protein,
     with open(topol_path, "w") as f:
         f.writelines(lines)
 
+def eliminar_agua_y_actualizar_topologia(pdb_dir, topol_path):
+    print("\n¿Desea eliminar el excedente de moléculas de agua? (Es necesario) (s/n)\n")
+    if input().strip().lower() == 's':
+        cmd = [
+            "perl", "files/water_deletor.pl",
+            "-in", os.path.join(pdb_dir, "system_solv.gro"),
+            "-out", os.path.join(pdb_dir, "system_solv_fix.gro"),
+            "-ref", "O33",
+            "-middle", "C50",
+            "-nwater", "3"
+        ]
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        print(result.stdout)  # Mostrar mensaje del script Perl
+
+        match = re.search(r"(\d+)\s+water molecules remain", result.stdout)
+        if not match:
+            raise ValueError("No se pudo encontrar el número de moléculas de agua restantes en la salida.")
+
+        n_sol = int(match.group(1))
+
+        with open(topol_path, "r") as f:
+            lines = f.readlines()
+
+        for i in range(len(lines)):
+            if lines[i].strip().startswith("SOL"):
+                lines[i] = f"SOL    {n_sol}\n"
+                break
+        else:
+            lines.append(f"SOL    {n_sol}\n")
+
+        with open(topol_path, "w") as f:
+            f.writelines(lines)
+
+
 def caja_y_solvatar(prot, pdb_dir):
     print("\n====== Paso 3: Caja de solvatación ======\n")
 
@@ -383,9 +418,8 @@ def caja_y_solvatar(prot, pdb_dir):
         else:
             print("VMD no está instalado o no está en el PATH.")
 
-    print("\n¿Desea eliminar el excedente de moléculas de agua? (Es necesario) (s/n)\n")
-    if input().strip().lower() == 's':
-        run(f"perl files/water_deletor.pl -in {pdb_dir}/system_solv.gro -out {pdb_dir}/system_solv_fix.gro -ref O33 -middle C50 -nwater 3")
+    eliminar_agua_y_actualizar_topologia(pdb_dir, os.path.join(pdb_dir, "topol.top"))
+
     print("\n¿Deseas visualizar cómo se ve el sistema actualmente con VMD? (s/n): ", end="")
     if input().strip().lower() == 's':
         if shutil.which("vmd"):
