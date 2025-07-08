@@ -4,3 +4,4 @@ area.dat
 *.out
 a.out
 shrink_loop
+.vscode
