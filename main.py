@@ -222,49 +222,47 @@ def modificar_topologia(pdb_dir):
 
     print("\nCampo de fuerza y topología modificados correctamente ^v^.")
 
-def actualizar_topologia_con_dppc(topol_path, gro_path, n_atoms_por_dppc=50):
-    with open(gro_path, 'r') as f:
-        gro_lines = f.readlines()
-    n_gro_atoms = len(gro_lines) - 3  
+def actualizar_topologia_con_dppc(topol_path, gro_path_system, gro_path_protein, n_atoms_por_dppc=50):
+    with open(gro_path_system, 'r') as f:
+        n_atoms_total = len(f.readlines()) - 3
+
+    with open(gro_path_protein, 'r') as f:
+        n_atoms_protein = len(f.readlines()) - 3
+
+    print(f"\nSe toman: {n_atoms_total} átomos del sistema, de los cuales {n_atoms_protein} son de la proteína.")
+    n_dppc = (n_atoms_total - n_atoms_protein) // n_atoms_por_dppc
+    print(f"\nSe asume que cada DPPC tiene {n_atoms_por_dppc} átomos, por lo que se añadirán {n_dppc} moléculas de DPPC.")
 
     with open(topol_path, 'r') as f:
         lines = f.readlines()
 
-    mol_index = None
+    mol_section_start = None
     for i, line in enumerate(lines):
         if line.strip().lower() == "[ molecules ]":
-            mol_index = i
+            mol_section_start = i
             break
-
-    if mol_index is None:
-        print("No se encontró la sección [ molecules ] en topol.top")
+    if mol_section_start is None:
         return
 
-    protein_atoms = 0
-    for i in range(mol_index + 1, len(lines)):
-        if lines[i].strip() == "" or lines[i].strip().startswith(";"):
+    protein_index = None
+    for i in range(mol_section_start + 1, len(lines)):
+        stripped = lines[i].strip()
+        if stripped.startswith(";") or stripped == "":
             continue
-        try:
-            _, count = lines[i].split()
-            protein_atoms = int(count)
+        if "protein" in stripped.lower():
+            protein_index = i
             break
-        except ValueError:
-            continue
+    if protein_index is None:
+        return
 
-    n_dppc = (n_gro_atoms - protein_atoms) // n_atoms_por_dppc
-    print(f"Número de DPPC = ({n_gro_atoms} - {protein_atoms}) // 50 = {n_dppc}")
+    if any("dppc" in line.lower() for line in lines[protein_index+1:]):
+        return
 
-    for i in reversed(range(len(lines))):
-        if lines[i].strip() == "" or lines[i].strip().startswith(";"):
-            continue
-        if lines[i].strip().lower().startswith("dppc") or lines[i].strip().lower().startswith("protein"):
-            lines[i] = f"DPPC\t{n_dppc}\n"
-            break
+    lines.insert(protein_index + 1, f"DPPC\t{n_dppc}\n")
 
-    with open(topol_path, 'w') as f:
+    with open(topol_path, "w") as f:
         f.writelines(lines)
 
-    print("Línea final de topol.top actualizada con DPPC correctamente.")
 
 
 
@@ -350,14 +348,13 @@ def caja_y_solvatar(prot, pdb_dir):
 
     print("\nInflando el sistema...\n")
 
-    
-
-
     run(f"perl {pdb_dir}/inflategro.pl {pdb_dir}/system.gro 4 DPPC 14 {pdb_dir}/system_inflated.gro 5 area.dat")
     actualizar_topologia_con_dppc(
         topol_path=os.path.join(pdb_dir, "topol.top"),
-        gro_path=os.path.join(pdb_dir, "system_inflated.gro")
+        gro_path_system=os.path.join(pdb_dir, "system_inflated.gro"),
+        gro_path_protein=os.path.join(pdb_dir, f"{prot}_processed.gro")
     )
+
     origen_mdout = os.path.join("mdout.mdp")
     destino_mdout = os.path.join(pdb_dir, "mdout.mdp")
     shutil.move(origen_mdout, destino_mdout)
@@ -366,13 +363,11 @@ def caja_y_solvatar(prot, pdb_dir):
     destino_area = os.path.join(pdb_dir, "area.dat")
     shutil.move(origen_area, destino_area)
 
-    run(f"gmx grompp -f {pdb_dir}/minim_inflategro.mdp -c {pdb_dir}/system_inflated.gro -p {pdb_dir}/topol.top -r {pdb_dir}/system_inflated.gro -o {pdb_dir}/system_inflated_em.tpr")
+    run(f"gmx grompp -f {pdb_dir}/minim_inflategro.mdp -c {pdb_dir}/system_inflated.gro -p {pdb_dir}/topol.top -r {pdb_dir}/system_inflated.gro -o {pdb_dir}/system_inflated_em.tpr -maxwarn 3")
     run(f"gmx mdrun -deffnm {pdb_dir}/system_inflated_em")
     run(f"gmx trjconv -s {pdb_dir}/system_inflated_em.tpr -f {pdb_dir}/system_inflated_em.gro -o {pdb_dir}/tmp.gro -pbc mol")
     run(f"mv {pdb_dir}/tmp.gro {pdb_dir}/system_inflated_em.gro")
     run(f"perl {pdb_dir}/inflategro.pl {pdb_dir}/system_inflated_em.gro 0.95 DPPC 0 {pdb_dir}/system_shrink1.gro 5 {pdb_dir}/area_shrink1.dat")
-
-
 
 def main():
     print("\n====== Proteina en membrana con GROMACS automatizada c; ======\n")
