@@ -355,19 +355,31 @@ def caja_y_solvatar(prot, pdb_dir):
         gro_path_protein=os.path.join(pdb_dir, f"{prot}_processed.gro")
     )
 
-    origen_mdout = os.path.join("mdout.mdp")
-    destino_mdout = os.path.join(pdb_dir, "mdout.mdp")
-    shutil.move(origen_mdout, destino_mdout)
-
     origen_area = os.path.join("area.dat")
     destino_area = os.path.join(pdb_dir, "area.dat")
     shutil.move(origen_area, destino_area)
 
     run(f"gmx grompp -f {pdb_dir}/minim_inflategro.mdp -c {pdb_dir}/system_inflated.gro -p {pdb_dir}/topol.top -r {pdb_dir}/system_inflated.gro -o {pdb_dir}/system_inflated_em.tpr -maxwarn 3")
     run(f"gmx mdrun -deffnm {pdb_dir}/system_inflated_em")
+
+    print("\nVamos a corregir el PBC (Periodic Boundary Conditions) del sistema inflado...\n")
+    print("En la siguiente opción, selecciona el Grupo 0 (0), que corresponde a todo el sistema.\n")
+    input("\n¿Entendido? Presiona Enter para continuar...")
+
     run(f"gmx trjconv -s {pdb_dir}/system_inflated_em.tpr -f {pdb_dir}/system_inflated_em.gro -o {pdb_dir}/tmp.gro -pbc mol")
     run(f"mv {pdb_dir}/tmp.gro {pdb_dir}/system_inflated_em.gro")
     run(f"perl {pdb_dir}/inflategro.pl {pdb_dir}/system_inflated_em.gro 0.95 DPPC 0 {pdb_dir}/system_shrink1.gro 5 {pdb_dir}/area_shrink1.dat")
+
+    print("\nReduciendo el tamaño de la caja...\nVamos a hacer lo mismo 26 veces :p")
+    input("Entendido? Presiona Enter para continuar...")
+
+    run("gcc -o shrink_loop files/shrink_loop.c")
+
+    run(f"./shrink_loop {pdb_dir}")
+
+    origen_mdout = os.path.join("mdout.mdp")
+    destino_mdout = os.path.join(pdb_dir, "mdout.mdp")
+    shutil.move(origen_mdout, destino_mdout)
 
 def main():
     print("\n====== Proteina en membrana con GROMACS automatizada c; ======\n")

@@ -1,3 +1,6 @@
 .venv
 mdout.mdp
 area.dat
+*.out
+a.out
+shrink_loop
