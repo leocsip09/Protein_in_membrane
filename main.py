@@ -432,9 +432,6 @@ def caja_y_solvatar(prot, pdb_dir):
     destino_mdout = os.path.join(pdb_dir, "mdout.mdp")
     shutil.move(origen_mdout, destino_mdout)
 
-
-
-
 def add_ions(pdb_dir):
     print("\n====== Paso 4: Añadir iones al sistema ======\n")
     print("\nVamos a añadir iones al sistema para neutralizar las cargas.")
@@ -477,7 +474,20 @@ def minimizacion_energia(pdb_dir):
     print("Minimización completada, verificando que todo esté en orden...")
     verificar_minimizacion(pdb_dir)
     print("\nMinimización energética completada correctamente. El sistema está listo para la simulación.\n")
-
+    
+def equilibracion(pdb_dir):
+    print(f"\n====== Paso 6: Equilibración ======\n")
+    print(f"\nPara la siguiente pregunta, escribir: '1 | 13' y presionar Enter\n Después escribir 'q' y presionar Enter")
+    print("Esto crea un índice de grupos de la fusión de Protein (1) y la membrana (13) para la simulación.")
+    input("¿Entendido? Presiona Enter para continuar...")
+    run(f"gmx make_ndx -f {pdb_dir}/em.gro -o {pdb_dir}/index.ndx")
+    print(f"Empezando fase de equilibración con NVT...")
+    run(f"gmx grompp -f files/nvt.mdp -c {pdb_dir}/em.gro -r {pdb_dir}/em.gro -p {pdb_dir}/topol.top -n {pdb_dir}/index.ndx -o {pdb_dir}/nvt.tpr -maxwarn 3")
+    run(f"gmx mdrun -deffnm {pdb_dir}/nvt")
+    print(f"Empezando fase de equilibración con NPT...")
+    run(f"gmx grompp -f files/npt.mdp -c {pdb_dir}/nvt.gro -r {pdb_dir}/nvt.gro -t {pdb_dir}/nvt.cpt -p {pdb_dir}/topol.top -n {pdb_dir}/index.ndx -o {pdb_dir}/npt.tpr -maxwarn 3")
+    run(f"gmx mdrun -deffnm {pdb_dir}/npt")
+    print(f"\nEquilibración NVT y NPT completada correctamente. El sistema está listo para la producción de simulación. Yeiiiiii\n")
 
 
 def main():
@@ -505,6 +515,8 @@ def main():
     add_ions(pdb_dir)
 
     minimizacion_energia(pdb_dir)
+
+    equilibracion(pdb_dir)
 
     
 if __name__ == "__main__":
