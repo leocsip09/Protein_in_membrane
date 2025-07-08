@@ -432,9 +432,6 @@ def caja_y_solvatar(prot, pdb_dir):
     destino_mdout = os.path.join(pdb_dir, "mdout.mdp")
     shutil.move(origen_mdout, destino_mdout)
 
-import subprocess
-import os
-
 def neutralizar_sistema(pdb_dir):
     ions_tpr = os.path.join(pdb_dir, "ions.tpr")
     solv_fix = os.path.join(pdb_dir, "system_solv_fix.gro")
@@ -467,7 +464,7 @@ def neutralizar_sistema(pdb_dir):
 
 
 
-def Add_ions(pdb_dir):
+def add_ions(pdb_dir):
     print("\n====== Paso 4: Añadir iones al sistema ======\n")
     print("\nVamos a añadir iones al sistema para neutralizar las cargas.")
     input("¿Entendido? Presiona Enter para continuar...")
@@ -532,6 +529,10 @@ def main():
     modificar_topologia(pdb_dir)
 
     caja_y_solvatar(prot, pdb_dir)
+
+    add_ions(pdb_dir)
+
+    minimizacion_energia(pdb_dir)
 
     
 if __name__ == "__main__":
