@@ -489,6 +489,10 @@ def equilibracion(pdb_dir):
     run(f"gmx mdrun -deffnm {pdb_dir}/npt")
     print(f"\nEquilibración NVT y NPT completada correctamente. El sistema está listo para la producción de simulación. Yeiiiiii\n")
 
+def produccion_MD(pdb_dir):
+    print(f"\n====== Paso 7: Producción de la dinámica molecular ======\n")
+    run(f"gmx grompp -f files/md.mdp -c {pdb_dir}/npt.gro -t {pdb_dir}/npt.cpt -p {pdb_dir}/topol.top -n {pdb_dir}/index.ndx -o {pdb_dir}/md_0_1.tpr -maxwarn 3")
+    run(f"gmx mdrun -deffnm {pdb_dir}/md_0_1")
 
 def main():
     print("\n====== Proteina en membrana con GROMACS automatizada c; ======\n")
