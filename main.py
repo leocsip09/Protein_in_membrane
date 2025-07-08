@@ -432,35 +432,6 @@ def caja_y_solvatar(prot, pdb_dir):
     destino_mdout = os.path.join(pdb_dir, "mdout.mdp")
     shutil.move(origen_mdout, destino_mdout)
 
-def neutralizar_sistema(pdb_dir):
-    ions_tpr = os.path.join(pdb_dir, "ions.tpr")
-    solv_fix = os.path.join(pdb_dir, "system_solv_fix.gro")
-    output = os.path.join(pdb_dir, "system_solv_ions.gro")
-    topol = os.path.join(pdb_dir, "topol.top")
-
-    print("\nNeutralizando el sistema con iones...")
-    print("\nLista de grupos disponibles para reemplazar (generalmente agua):")
-    subprocess.run(f"gmx make_ndx -f {solv_fix} -o {pdb_dir}/index.ndx", shell=True, input="q\n", text=True)
-    subprocess.run(f"gmx genion -s {ions_tpr} -o {output} -p {topol} -pname NA -nname CL -neutral -n {pdb_dir}/index.ndx", shell=True)
-
-    grupo = input("\nIngrese el número del grupo que desea reemplazar con iones (ej. 13 para SOL): ").strip()
-
-    proceso = subprocess.Popen(
-        f"gmx genion -s {ions_tpr} -o {output} -p {topol} -pname NA -nname CL -neutral -n {pdb_dir}/index.ndx",
-        shell=True,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
-    )
-
-    stdout, stderr = proceso.communicate(input=f"{grupo}\n")
-
-    print(stdout)
-    if proceso.returncode != 0:
-        print("\nError al ejecutar gmx genion:\n")
-        print(stderr)
-        raise RuntimeError("gmx genion falló")
 
 
 
@@ -469,8 +440,9 @@ def add_ions(pdb_dir):
     print("\nVamos a añadir iones al sistema para neutralizar las cargas.")
     input("¿Entendido? Presiona Enter para continuar...")
 
-    run(f"gmx grompp -f files/ions.mdp -c {pdb_dir}/system_solv_fix.gro -p {pdb_dir}/topol.top -o {pdb_dir}/ions.tpr")
-    neutralizar_sistema(pdb_dir)
+    run(f"gmx grompp -f files/ions.mdp -c {pdb_dir}/system_solv_fix.gro -p {pdb_dir}/topol.top -o {pdb_dir}/ions.tpr -maxwarn 3")
+    print("\nSelecciona el grupo 15 (SOL) para la siguiente pregunta.")
+    run(f"gmx genion -s {pdb_dir}/ions.tpr -o {pdb_dir}/system_solv_ions.gro -p {pdb_dir}/topol.top -pname NA -nname CL -neutral")
     print("\nIones añadidos al sistema y topología actualizada correctamente.\n")
 
 def verificar_minimizacion(pdb_dir):
@@ -498,9 +470,9 @@ def verificar_minimizacion(pdb_dir):
 
 def minimizacion_energia(pdb_dir):
     print("\n====== Paso 5: Minimización energética ======\n")
-    print("\nVamos a añadir iones al sistema para neutralizar las cargas c:.")
+    print("\nVamos a minimizar la energía del sistema para ser simulable c:.")
     input("¿Entendido? Presiona Enter para continuar...")
-    run(f"gmx grompp -f files/minim_en.mdp -c {pdb_dir}/system_solv_ions.gro -p {pdb_dir}/topol.top -o {pdb_dir}/em.tpr")
+    run(f"gmx grompp -f files/minim_en.mdp -c {pdb_dir}/system_solv_ions.gro -p {pdb_dir}/topol.top -o {pdb_dir}/em.tpr -maxwarn 3")
     run(f"gmx mdrun -deffnm {pdb_dir}/em")
     print("Minimización completada, verificando que todo esté en orden...")
     verificar_minimizacion(pdb_dir)
