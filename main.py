@@ -513,11 +513,12 @@ def analizar_sistema_membrana(pdb_dir):
         vis = input("¿Deseas visualizar el sistema? (s/n): ").lower()
         if vis == 's':
             visor = input("¿Con qué visor? (1) VMD o (2) ChimeraX: ")
-            archivo = input("Archivo a visualizar (ej. md_0_1.tpr o md.gro): ")
+            archivo = input("Archivo a visualizar (ej. md_0_1.gro): ")
             if visor == '1':
                 ejecutar_comando(['vmd', archivo])
             elif visor == '2':
-                ejecutar_comando(['chimerax', archivo])
+                run(f"gmx edit conf -f {archivo} -o sistema.pdb")
+                print("Sistema convertido a .pdb (Ejecutar desde el directorio) :3")
             else:
                 print("Opción inválida")
 
