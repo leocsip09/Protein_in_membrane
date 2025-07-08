@@ -493,6 +493,78 @@ def produccion_MD(pdb_dir):
     print(f"\n====== Paso 7: Producción de la dinámica molecular ======\n")
     run(f"gmx grompp -f files/md.mdp -c {pdb_dir}/npt.gro -t {pdb_dir}/npt.cpt -p {pdb_dir}/topol.top -n {pdb_dir}/index.ndx -o {pdb_dir}/md_0_1.tpr -maxwarn 3")
     run(f"gmx mdrun -deffnm {pdb_dir}/md_0_1")
+    print(f"\nProducción de la dinámica molecular completada. Los archivos de salida se encuentran en {pdb_dir}.\n")
+
+def analizar_sistema_membrana(pdb_dir):
+    print("\n====== Paso 8: Análisis del sistema de membrana ======\n")
+    print("Vamos a realizar algunos análisis del sistema de membrana.")
+    os.chdir(pdb_dir)
+
+    def ejecutar_comando(comando):
+        print(f"\n> Ejecutando: {' '.join(comando)}\n")
+        subprocess.run(comando)
+
+    def visualizar_grafica():
+        if input("¿Deseas visualizar la gráfica con xmgrace? (s/n): ").lower() == 's':
+            archivo = input("Nombre del archivo .xvg a visualizar: ")
+            ejecutar_comando(['xmgrace', archivo])
+
+    def visualizar_sistema():
+        vis = input("¿Deseas visualizar el sistema? (s/n): ").lower()
+        if vis == 's':
+            visor = input("¿Con qué visor? (1) VMD o (2) ChimeraX: ")
+            archivo = input("Archivo a visualizar (ej. md_0_1.tpr o md.gro): ")
+            if visor == '1':
+                ejecutar_comando(['vmd', archivo])
+            elif visor == '2':
+                ejecutar_comando(['chimerax', archivo])
+            else:
+                print("Opción inválida")
+
+    def deuterium_order():
+        ejecutar_comando(['gmx', 'make_ndx', '-f', 'md_0_1.tpr', '-o', 'sn1.ndx'])
+        ejecutar_comando(['gmx', 'order', '-s', 'md_0_1.tpr', '-f', 'md_0_1.xtc', '-n', 'sn1.ndx', '-d', 'z', '-od', 'deuter_sn1.xvg'])
+        visualizar_grafica()
+
+    def densidad_membrana():
+        ejecutar_comando(['gmx', 'make_ndx', '-f', 'md_0_1.tpr', '-o', 'density_groups.ndx'])
+        grupos = [('Headgroups', 'dens_headgroups.xvg'), ('Glycerol_Ester', 'dens_glyc.xvg'), ('Acyl_Chains', 'dens_acyl.xvg')]
+        for nombre, archivo in grupos:
+            print(f"\n→ Analizando densidad del grupo: {nombre}")
+            ejecutar_comando(['gmx', 'density', '-s', 'md_0_1.tpr', '-f', 'md_0_1.xtc', '-n', 'density_groups.ndx', '-o', archivo, '-d', 'Z'])
+            visualizar_grafica()
+
+    def diffusion_lateral():
+        ejecutar_comando(['gmx', 'make_ndx', '-f', 'md_0_1.tpr', '-o', 'p8.ndx'])
+        ejecutar_comando(['gmx', 'msd', '-s', 'md_0_1.tpr', '-f', 'md_0_1.xtc', '-n', 'p8.ndx', '-lateral', 'z'])
+        visualizar_grafica()
+
+    def menu():
+        while True:
+            print("\nAnálisis disponibles:")
+            print("1. Ver sistema en VMD o ChimeraX")
+            print("2. Deuterium Order Parameters")
+            print("3. Densidad de la Membrana")
+            print("4. Difusión lateral de lípidos")
+            print("5. Salir")
+            opcion = input("Selecciona una opción: ")
+
+            if opcion == '1':
+                visualizar_sistema()
+            elif opcion == '2':
+                deuterium_order()
+            elif opcion == '3':
+                densidad_membrana()
+            elif opcion == '4':
+                diffusion_lateral()
+            elif opcion == '5':
+                print("Saliendo del análisis.")
+                break
+            else:
+                print("Opción inválida")
+
+    menu()
+
 
 def main():
     print("\n====== Proteina en membrana con GROMACS automatizada c; ======\n")
@@ -516,11 +588,17 @@ def main():
 
     caja_y_solvatar(prot, pdb_dir)
 
+    run(f"rm shrink_loop")
+
     add_ions(pdb_dir)
 
     minimizacion_energia(pdb_dir)
 
     equilibracion(pdb_dir)
+
+    produccion_MD(pdb_dir)
+
+    analizar_sistema_membrana(pdb_dir)
 
     
 if __name__ == "__main__":
